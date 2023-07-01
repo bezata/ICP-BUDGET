@@ -1,0 +1,17 @@
+type Budget = record { total : float64 };
+type Payment = record {
+  id : text;
+  createdAt : nat64;
+  updatedAt : opt nat64;
+  amount : float64;
+};
+type _AzleResult = variant { Ok : Payment; Err : text };
+type _AzleResult_1 = variant { Ok : Budget; Err : text };
+service : () -> {
+  createPayment : (text, float64) -> (_AzleResult);
+  deletePayment : (text) -> (_AzleResult);
+  getTotalPayments : () -> (float64) query;
+  readPayment : (text) -> (_AzleResult) query;
+  setBudget : (float64) -> (_AzleResult_1);
+  updatePayment : (text, float64) -> (_AzleResult);
+}

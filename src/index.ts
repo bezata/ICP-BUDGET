@@ -12,44 +12,52 @@ import {
 } from "azle";
 import { v4 as uuidv4 } from "uuid";
 
-interface Payment {
+type Payment = Record<{
   id: string;
   amount: number;
   createdAt: nat64;
-}
+  updatedAt: Opt<nat64>;
+}>;
 
-const budgetStorage = new StableBTreeMap<string, Opt<number>>(0, 44, 1024);
+type Budget = Record<{
+  total: number;
+}>;
+
 const paymentStorage = new StableBTreeMap<string, Payment>(0, 44, 1024);
+let budget: Budget = { total: 0 };
 
 $update;
-export function setBudget(amount: number): Result<undefined, string> {
-  budgetStorage.insert("budget", Opt.Some(amount));
-  return Result.Ok(undefined);
+export function setBudget(amount: number): Result<Budget, string> {
+  budget = { total: amount };
+  return Result.Ok(budget);
 }
 
 $update;
-export function createPayment(amount: number): Result<Payment, string> {
-  const budget = budgetStorage.get("budget");
-  if (budget === Opt.None || budget.value === undefined) {
-    return Result.Err("Budget not set");
+export function createPayment(
+  id: string,
+  amount: number
+): Result<Payment, string> {
+  const name = id;
+  const totalPayments = getTotalPayments();
+  if (totalPayments + amount > budget.total) {
+    return Result.Err<Payment, string>("Budget exceeded");
   }
-
-  const totalPayments = paymentStorage
-    .values()
-    .reduce((sum, payment) => sum + payment.amount, 0);
-
-  if (totalPayments + amount > budget.value) {
-    return Result.Err("Payment amount exceeds budget");
-  }
-
-  const payment: Payment = {
-    id: uuidv4(),
-    amount,
+  const newPayment: Payment = {
+    id: name,
+    amount: amount,
     createdAt: ic.time(),
+    updatedAt: Opt.None,
   };
+  paymentStorage.insert(newPayment.id, newPayment);
+  return Result.Ok(newPayment);
+}
 
-  paymentStorage.insert(payment.id, payment);
-  return Result.Ok(payment);
+$query;
+export function readPayment(id: string): Result<Payment, string> {
+  return match(paymentStorage.get(id), {
+    Some: (payment) => Result.Ok<Payment, string>(payment),
+    None: () => Result.Err<Payment, string>(`Payment with id=${id} not found`),
+  });
 }
 
 $update;
@@ -57,56 +65,52 @@ export function updatePayment(
   id: string,
   amount: number
 ): Result<Payment, string> {
-  const payment = paymentStorage.get(id);
-  if (payment === Opt.None) {
-    return Result.Err(`Payment with id=${id} not found`);
-  }
-
-  const budget = budgetStorage.get("budget");
-  if (budget === Opt.None || budget.value === undefined) {
-    return Result.Err("Budget not set");
-  }
-
-  const totalPayments = paymentStorage
-    .values()
-    .reduce((sum, p) => (p.id === id ? sum : sum + p.amount), 0);
-
-  if (totalPayments + amount > budget.value) {
-    return Result.Err("Payment amount exceeds budget");
-  }
-
-  const updatedPayment: Payment = {
-    ...payment.value,
-    amount,
-    createdAt: payment.value.createdAt,
-  };
-
-  paymentStorage.insert(id, updatedPayment);
-  return Result.Ok(updatedPayment);
+  return match(paymentStorage.get(id), {
+    Some: (payment) => {
+      const totalPayments = getTotalPayments() - payment.amount;
+      if (totalPayments + amount > budget.total) {
+        return Result.Err<Payment, string>("Budget exceeded");
+      }
+      const updatedPayment = {
+        ...payment,
+        amount: amount,
+        updatedAt: Opt.Some(ic.time()),
+      };
+      paymentStorage.insert(id, updatedPayment);
+      return Result.Ok(updatedPayment);
+    },
+    None: () => Result.Err<Payment, string>(`Payment with id=${id} not found`),
+  });
 }
 
 $update;
-export function deletePayment(id: string): Result<undefined, string> {
-  const payment = paymentStorage.get(id);
-  if (payment === Opt.None) {
-    return Result.Err(`Payment with id=${id} not found`);
-  }
-
-  paymentStorage.remove(id);
-  return Result.Ok(undefined);
+export function deletePayment(id: string): Result<Payment, string> {
+  return match(paymentStorage.remove(id), {
+    Some: (payment) => Result.Ok<Payment, string>(payment),
+    None: () =>
+      Result.Err<Payment, string>(
+        `Couldn't delete payment with id=${id}. Payment not found.`
+      ),
+  });
 }
 
 $query;
-export function getPayments(): Result<Vec<Payment>, string> {
-  return Result.Ok(paymentStorage.values());
+export function getTotalPayments(): number {
+  return Array.from(paymentStorage.values()).reduce(
+    (total, payment) => total + payment.amount,
+    0
+  );
 }
 
-$query;
-export function getBudget(): Result<number, string> {
-  const budget = budgetStorage.get("budget");
-  if (budget === Opt.None || budget.value === undefined) {
-    return Result.Err("Budget not set");
-  }
+// a workaround to make uuid package work with Azle
+globalThis.crypto = {
+  getRandomValues: () => {
+    let array = new Uint8Array(32);
 
-  return Result.Ok(budget.value);
-}
+    for (let i = 0; i < array.length; i++) {
+      array[i] = Math.floor(Math.random() * 256);
+    }
+
+    return array;
+  },
+};
