@@ -53,11 +53,21 @@ export function createPayment(
 }
 
 $query;
+export function getBudget(): Result<Budget, string> {
+  return Result.Ok(budget);
+}
+
+$query;
 export function readPayment(id: string): Result<Payment, string> {
   return match(paymentStorage.get(id), {
     Some: (payment) => Result.Ok<Payment, string>(payment),
     None: () => Result.Err<Payment, string>(`Payment with id=${id} not found`),
   });
+}
+
+$query;
+export function listPayments(): Result<Vec<Payment>, string> {
+  return Result.Ok(Array.from(paymentStorage.values()));
 }
 
 $update;
@@ -102,6 +112,17 @@ export function getTotalPayments(): number {
   );
 }
 
+$query;
+export function getBudgetUsagePercentage(): number {
+  const totalPayments = getTotalPayments();
+  return (totalPayments / budget.total) * 100;
+}
+
+$query;
+export function getRemainingBudget(): number {
+  const totalPayments = getTotalPayments();
+  return budget.total - totalPayments;
+}
 // a workaround to make uuid package work with Azle
 globalThis.crypto = {
   getRandomValues: () => {
@@ -114,3 +135,4 @@ globalThis.crypto = {
     return array;
   },
 };
+
