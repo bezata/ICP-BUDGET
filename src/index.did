@@ -5,13 +5,25 @@ type Payment = record {
   updatedAt : opt nat64;
   amount : float64;
 };
-type _AzleResult = variant { Ok : Payment; Err : text };
-type _AzleResult_1 = variant { Ok : Budget; Err : text };
-service : () -> {
-  createPayment : (text, float64) -> (_AzleResult);
-  deletePayment : (text) -> (_AzleResult);
+type Spender = record { id : principal };
+type _AzleResult = variant { Ok : nat8; Err : text };
+type _AzleResult_1 = variant { Ok : Payment; Err : text };
+type _AzleResult_2 = variant { Ok : text; Err : text };
+type _AzleResult_3 = variant { Ok : Budget; Err : text };
+type _AzleResult_4 = variant { Ok : vec Payment; Err : text };
+service : (text) -> {
+  addSpender : (Spender) -> (_AzleResult);
+  createPayment : (text, float64) -> (_AzleResult_1);
+  deletePayment : (text) -> (_AzleResult_1);
+  deleteSpender : (nat8) -> (_AzleResult_2);
+  getBudget : () -> (_AzleResult_3) query;
+  getBudgetUsagePercentage : () -> (float64) query;
+  getRemainingBudget : () -> (float64) query;
   getTotalPayments : () -> (float64) query;
-  readPayment : (text) -> (_AzleResult) query;
-  setBudget : (float64) -> (_AzleResult_1);
-  updatePayment : (text, float64) -> (_AzleResult);
+  isAdmin : (text) -> (bool) query;
+  isSpender : (text) -> (bool) query;
+  listPayments : () -> (_AzleResult_4) query;
+  readPayment : (text) -> (_AzleResult_1) query;
+  setBudget : (float64) -> (_AzleResult_3);
+  updatePayment : (text, float64) -> (_AzleResult_1);
 }
