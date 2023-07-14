@@ -17,7 +17,6 @@ type Payment = Record<{
   amount: number;
   createdAt: nat64;
   updatedAt: Opt<nat64>;
-  category: string; // Added category field for payment categorization
 }>;
 
 type Budget = Record<{
@@ -36,8 +35,7 @@ export function setBudget(amount: number): Result<Budget, string> {
 $update;
 export function createPayment(
   id: string,
-  amount: number,
-  category: string
+  amount: number
 ): Result<Payment, string> {
   const name = id;
   const totalPayments = getTotalPayments();
@@ -49,7 +47,6 @@ export function createPayment(
     amount: amount,
     createdAt: ic.time(),
     updatedAt: Opt.None,
-    category: category, // Set the provided category for the payment
   };
   paymentStorage.insert(newPayment.id, newPayment);
   return Result.Ok(newPayment);
@@ -126,45 +123,6 @@ export function getRemainingBudget(): number {
   const totalPayments = getTotalPayments();
   return budget.total - totalPayments;
 }
-
-$query;
-export function filterPaymentsByCategory(
-  category: string
-): Result<Vec<Payment>, string> {
-  const filteredPayments = Array.from(paymentStorage.values()).filter(
-    (payment) => payment.category === category
-  );
-  return Result.Ok(filteredPayments);
-}
-
-$query;
-export function sortPaymentsByAmount(
-  ascending: boolean = true
-): Result<Vec<Payment>, string> {
-  const sortedPayments = Array.from(paymentStorage.values()).sort(
-    (a, b) => (ascending ? a.amount - b.amount : b.amount - a.amount)
-  );
-  return Result.Ok(sortedPayments);
-}
-
-$update;
-export function schedulePaymentReminder(
-  id: string,
-  reminderTime: nat64
-): Result<Payment, string> {
-  return match(paymentStorage.get(id), {
-    Some: (payment) => {
-      const updatedPayment = {
-        ...payment,
-        reminderTime: Opt.Some(reminderTime),
-      };
-      paymentStorage.insert(id, updatedPayment);
-      return Result.Ok(updatedPayment);
-    },
-    None: () => Result.Err<Payment, string>(`Payment with id=${id} not found`),
-  });
-}
-
 // a workaround to make uuid package work with Azle
 globalThis.crypto = {
   getRandomValues: () => {
@@ -177,3 +135,5 @@ globalThis.crypto = {
     return array;
   },
 };
+
+
